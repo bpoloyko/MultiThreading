@@ -5,6 +5,8 @@
  * Use Thread, ThreadPool or Task classes for thread creation and any kind of synchronization constructions.
  */
 using System;
+using System.Collections.Generic;
+using System.Threading;
 
 namespace MultiThreading.Task5.Threads.SharedCollection
 {
@@ -17,9 +19,45 @@ namespace MultiThreading.Task5.Threads.SharedCollection
             Console.WriteLine("Use Thread, ThreadPool or Task classes for thread creation and any kind of synchronization constructions.");
             Console.WriteLine();
 
-            // feel free to add your code
+            var isCompleted = false;
+            var waitHandleAdd = new AutoResetEvent(true);
+            var waitHandlePrint = new AutoResetEvent(false);
+            var collection = new List<int>();
+
+            var threadAdd = new Thread(() =>
+            {
+                for (var i = 1; i <= 10; i++)
+                {
+                    waitHandleAdd.WaitOne();
+
+                    collection.Add(i);
+
+                    waitHandlePrint.Set();
+                }
+
+                isCompleted = true;
+            });
+
+            threadAdd.Start();
+            var threadPrint = new Thread(() =>
+            {
+                while (!isCompleted)
+                {
+                    waitHandlePrint.WaitOne();
+
+                    Print(collection);
+
+                    waitHandleAdd.Set();
+                }
+            });
+            threadPrint.Start();
 
             Console.ReadLine();
+        }
+
+        private static void Print(IEnumerable<int> collection)
+        {
+            Console.WriteLine(string.Join(",", collection));
         }
     }
 }

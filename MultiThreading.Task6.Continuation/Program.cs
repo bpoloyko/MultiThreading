@@ -7,6 +7,8 @@
    Demonstrate the work of the each case with console utility.
 */
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MultiThreading.Task6.Continuation
 {
@@ -22,9 +24,74 @@ namespace MultiThreading.Task6.Continuation
             Console.WriteLine("Demonstrate the work of the each case with console utility.");
             Console.WriteLine();
 
-            // feel free to add your code
+            CaseA();
+
+            CaseB();
+            
+            CaseC();
+
+            CaseD();
 
             Console.ReadLine();
+        }
+
+        private static void CaseA()
+        {
+            Console.WriteLine("Case a:");
+            var taskA = Task.Factory.StartNew(() => throw new Exception("Exception in parent")).ContinueWith(ant => Console.WriteLine("Continuation"));
+            taskA.Wait();
+        }
+
+        private static void CaseB()
+        {
+            Console.WriteLine("Case b:");
+            var taskB = Task.Factory.StartNew(() => throw new Exception("Exception in parent")).ContinueWith(ant => Console.WriteLine(ant.Exception.Message), TaskContinuationOptions.OnlyOnFaulted);
+            taskB.Wait();
+        }
+
+        private static void CaseC()
+        {
+            Console.WriteLine("Case c:");
+            var taskC = Task.Factory.StartNew(() =>
+            {
+                Console.WriteLine($"Antecedent thread: {Thread.CurrentThread.ManagedThreadId}");
+                throw new Exception("Exception in parent");
+            }).ContinueWith(ant =>
+            {
+                Console.WriteLine($"Continuation thread: {Thread.CurrentThread.ManagedThreadId}");
+                Console.WriteLine(ant.Exception.Message);
+            }, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+            taskC.Wait();
+        }
+
+        private static void CaseD()
+        {
+            Console.WriteLine("Case d:");
+            using (var cts = new CancellationTokenSource())
+            {
+                var token = cts.Token;
+
+                var taskD = Task.Factory.StartNew(() =>
+                {
+                    Thread.Sleep(1000);
+                    token.ThrowIfCancellationRequested();
+                }, token).ContinueWith(ant =>
+                {
+                    if (!Thread.CurrentThread.IsThreadPoolThread)
+                    {
+                        Console.WriteLine("Continuation is not from thread pool");
+                    }
+                }, TaskContinuationOptions.OnlyOnCanceled | TaskContinuationOptions.LongRunning);
+                cts.Cancel();
+                try
+                {
+                    taskD.Wait(token);
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine("Antecedent was cancelled");
+                }
+            }
         }
     }
 }
